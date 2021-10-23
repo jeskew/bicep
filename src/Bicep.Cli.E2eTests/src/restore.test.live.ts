@@ -21,6 +21,7 @@ import {
   expectFileExists,
   writeTempFile,
   readFileSync,
+  logFiles,
 } from "./utils/fs";
 import {
   environments,
@@ -49,6 +50,8 @@ describe("bicep restore", () => {
     )
       .shouldSucceed()
       .withEmptyStdout();
+
+    logFiles(pathToCachedTsModuleFile());
 
     expectFileExists(
       pathToCachedTsModuleFile(
