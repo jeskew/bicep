@@ -68,7 +68,6 @@ class BicepCommandTestRunner {
   }
 
   private runCommand() {
-    console.log(`Bicep CLI = ${bicepCli}`);
     const result = spawn.sync(bicepCli, this.args, {
       stdio: "pipe",
       encoding: "utf-8",

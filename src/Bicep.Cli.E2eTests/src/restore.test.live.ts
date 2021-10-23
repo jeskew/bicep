@@ -39,29 +39,32 @@ describe("bicep restore", () => {
   const testArea = "restore";
 
   // TODO: Referenced file has direct module refs
-  it("should restore template specs", () => {
-    const exampleFilePath = pathToExampleFile("external-modules", "main.bicep");
+  it.each(environments)("should restore template specs (%p)", (environment) => {
+    const exampleFilePath = pathToExampleFile(
+      "external-modules" + environment.suffix,
+      "main.bicep"
+    );
     invokingBicepCommand("restore", exampleFilePath)
       .shouldSucceed()
       .withEmptyStdout();
 
     expectFileExists(
       pathToCachedTsModuleFile(
-        "61e0a28a-63ed-4afc-9827-2ed09b7b30f3/bicep-ci/storageaccountspec-df/v1",
+        `${environment.templateSpecSubscriptionId}/bicep-ci/storageaccountspec-df/v1`,
         "main.json"
       )
     );
 
     expectFileExists(
       pathToCachedTsModuleFile(
-        "61e0a28a-63ed-4afc-9827-2ed09b7b30f3/bicep-ci/storageaccountspec-df/v2",
+        `${environment.templateSpecSubscriptionId}/bicep-ci/storageaccountspec-df/v2`,
         "main.json"
       )
     );
 
     expectFileExists(
       pathToCachedTsModuleFile(
-        "61e0a28a-63ed-4afc-9827-2ed09b7b30f3/bicep-ci/webappspec-df/1.0.0",
+        `${environment.templateSpecSubscriptionId}/bicep-ci/webappspec-df/1.0.0`,
         "main.json"
       )
     );
