@@ -12,10 +12,7 @@ import {
   expectBrModuleStructure,
   publishModule,
 } from "./utils/br";
-import {
-  invokingBicepCommand,
-  invokingBicepCommandWithEnvOverrides,
-} from "./utils/command";
+import { invokingBicepCommandWithEnvOverrides } from "./utils/command";
 import {
   moduleCacheRoot,
   pathToCachedTsModuleFile,
@@ -45,7 +42,11 @@ describe("bicep restore", () => {
       "external-modules" + environment.suffix,
       "main.bicep"
     );
-    invokingBicepCommand("restore", exampleFilePath)
+    invokingBicepCommandWithEnvOverrides(
+      createEnvironmentOverrides(environment),
+      "restore",
+      exampleFilePath
+    )
       .shouldSucceed()
       .withEmptyStdout();
 
