@@ -101,7 +101,7 @@ output blobEndpoint string = storage.outputs.blobEndpoint
           "bicepconfig.json"
         )
       );
-      writeTempFile("restore", "bicepconfig.json", exampleConfig);
+      writeTempFile("build", "bicepconfig.json", exampleConfig);
 
       invokingBicepCommandWithEnvOverrides(envOverrides, "build", bicepPath)
         .shouldSucceed()
