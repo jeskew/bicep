@@ -23,6 +23,7 @@ import {
   emptyDir,
   expectFileExists,
   writeTempFile,
+  readFileSync,
 } from "./utils/fs";
 import {
   environments,
@@ -84,7 +85,7 @@ describe("bicep restore", () => {
     publishModule(
       envOverrides,
       passthroughRef,
-      "local-modules",
+      "local-modules" + environment.suffix,
       "passthrough.bicep"
     );
 
@@ -108,6 +109,15 @@ output blobEndpoint string = storage.outputs.blobEndpoint
     `;
 
     const bicepPath = writeTempFile("restore", "main.bicep", bicep);
+
+    const exampleConfig = readFileSync(
+      pathToExampleFile(
+        "local-modules" + environment.suffix,
+        "bicepconfig.json"
+      )
+    );
+    writeTempFile("restore", "bicepconfig.json", exampleConfig);
+
     invokingBicepCommandWithEnvOverrides(envOverrides, "restore", bicepPath)
       .shouldSucceed()
       .withEmptyStdout();

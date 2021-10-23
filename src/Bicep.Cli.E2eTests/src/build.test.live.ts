@@ -38,7 +38,7 @@ module test 'br:${environment.registryUri}/does-not-exist:v-never' = {
       invokingBicepCommand("build", bicepPath, "--no-restore")
         .shouldFail()
         .withStderr(
-          /.+BCP190: The module with reference "br:biceptestdf.azurecr.io\/does-not-exist:v-never" has not been restored..*/
+          /.+BCP190: The module with reference "br:biceptest.+\.azurecr\.io\/does-not-exist:v-never" has not been restored..*/
         );
     }
   );
@@ -53,13 +53,18 @@ module test 'br:${environment.registryUri}/does-not-exist:v-never' = {
 
       const envOverrides = createEnvironmentOverrides(environment);
       const storageRef = builder.getBicepReference("storage", "v1");
-      publishModule(envOverrides, storageRef, "local-modules", "storage.bicep");
+      publishModule(
+        envOverrides,
+        storageRef,
+        "local-modules" + environment.suffix,
+        "storage.bicep"
+      );
 
       const passthroughRef = builder.getBicepReference("passthrough", "v1");
       publishModule(
         envOverrides,
         passthroughRef,
-        "local-modules",
+        "local-modules" + environment.suffix,
         "passthrough.bicep"
       );
 
