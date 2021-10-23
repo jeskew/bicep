@@ -8,6 +8,7 @@ export type Environment = {
   readonly clientId: string;
   readonly clientSecretEnvVar: string;
   readonly templateSpecSubscriptionId: string;
+  readonly resourceSuffix: string;
 };
 
 // all the live tests use the same list of environments
@@ -22,6 +23,7 @@ function createEnvironments(): Environment[] {
       clientId: "c162b385-991a-43df-b599-2d0a925e95c6",
       clientSecretEnvVar: "BICEP_SPN_PASSWORD",
       templateSpecSubscriptionId: "61e0a28a-63ed-4afc-9827-2ed09b7b30f3",
+      resourceSuffix: "df",
     },
   ];
 
@@ -33,6 +35,7 @@ function createEnvironments(): Environment[] {
       clientId: "fbbb49e5-e59c-4fce-9d7b-13925a36ad7f",
       clientSecretEnvVar: "BICEP_SPN_PASSWORD_FF",
       templateSpecSubscriptionId: "e21305d9-eef2-4990-8ed2-e2748236bee3",
+      resourceSuffix: "ff",
     });
   }
 

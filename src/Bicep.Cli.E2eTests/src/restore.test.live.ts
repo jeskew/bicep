@@ -51,21 +51,21 @@ describe("bicep restore", () => {
 
     expectFileExists(
       pathToCachedTsModuleFile(
-        `${environment.templateSpecSubscriptionId}/bicep-ci/storageaccountspec-df/v1`,
+        `${environment.templateSpecSubscriptionId}/bicep-ci/storageaccountspec-${environment.resourceSuffix}/v1`,
         "main.json"
       )
     );
 
     expectFileExists(
       pathToCachedTsModuleFile(
-        `${environment.templateSpecSubscriptionId}/bicep-ci/storageaccountspec-df/v2`,
+        `${environment.templateSpecSubscriptionId}/bicep-ci/storageaccountspec-${environment.resourceSuffix}/v2`,
         "main.json"
       )
     );
 
     expectFileExists(
       pathToCachedTsModuleFile(
-        `${environment.templateSpecSubscriptionId}/bicep-ci/webappspec-df/1.0.0`,
+        `${environment.templateSpecSubscriptionId}/bicep-ci/webappspec-${environment.resourceSuffix}/1.0.0`,
         "main.json"
       )
     );
@@ -79,7 +79,12 @@ describe("bicep restore", () => {
 
     const envOverrides = createEnvironmentOverrides(environment);
     const storageRef = builder.getBicepReference("storage", "v1");
-    publishModule(envOverrides, storageRef, "local-modules", "storage.bicep");
+    publishModule(
+      envOverrides,
+      storageRef,
+      "local-modules" + environment.suffix,
+      "storage.bicep"
+    );
 
     const passthroughRef = builder.getBicepReference("passthrough", "v1");
     publishModule(

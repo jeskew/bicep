@@ -16,7 +16,13 @@ import {
   invokingBicepCommand,
   invokingBicepCommandWithEnvOverrides,
 } from "./utils/command";
-import { expectFileExists, pathToTempFile, writeTempFile } from "./utils/fs";
+import {
+  expectFileExists,
+  pathToExampleFile,
+  pathToTempFile,
+  readFileSync,
+  writeTempFile,
+} from "./utils/fs";
 import {
   createEnvironmentOverrides,
   environments,
@@ -38,7 +44,7 @@ module test 'br:${environment.registryUri}/does-not-exist:v-never' = {
       invokingBicepCommand("build", bicepPath, "--no-restore")
         .shouldFail()
         .withStderr(
-          /.+BCP190: The module with reference "br:biceptest.+\.azurecr\.io\/does-not-exist:v-never" has not been restored..*/
+          /.+BCP190: The module with reference "br:biceptest.+\.azurecr\..+\/does-not-exist:v-never" has not been restored..*/
         );
     }
   );
@@ -88,6 +94,15 @@ output blobEndpoint string = storage.outputs.blobEndpoint
     `;
 
       const bicepPath = writeTempFile("build", "build-external.bicep", bicep);
+
+      const exampleConfig = readFileSync(
+        pathToExampleFile(
+          "local-modules" + environment.suffix,
+          "bicepconfig.json"
+        )
+      );
+      writeTempFile("restore", "bicepconfig.json", exampleConfig);
+
       invokingBicepCommandWithEnvOverrides(envOverrides, "build", bicepPath)
         .shouldSucceed()
         .withEmptyStdout();
