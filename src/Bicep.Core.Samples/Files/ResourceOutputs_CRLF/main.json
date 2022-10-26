@@ -1,0 +1,282 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-08-01/tenantDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "dev",
+      "templateHash": "2019759524231210800"
+    }
+  },
+  "parameters": {
+    "modSubId": {
+      "type": "string"
+    },
+    "modRgName": {
+      "type": "string"
+    },
+    "otherSubId": {
+      "type": "string"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "test",
+      "subscriptionId": "[parameters('modSubId')]",
+      "resourceGroup": "[parameters('modRgName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "foo": {
+            "value": "bar"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "dev",
+              "templateHash": "6948291255971177717"
+            }
+          },
+          "parameters": {
+            "foo": {
+              "type": "string",
+              "defaultValue": "[parameters('bar')]"
+            },
+            "bar": {
+              "type": "string",
+              "defaultValue": "baz"
+            }
+          },
+          "variables": {
+            "fizz": "[parameters('foo')]"
+          },
+          "resources": [],
+          "outputs": {
+            "storage": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Storage/storageAccounts', format('test{0}{1}{2}', variables('fizz'), resourceGroup().id, subscription().id))]",
+              "metadata": {
+                "resourceType": "Microsoft.Storage/storageAccounts@2019-06-01"
+              }
+            },
+            "container": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', format('test{0}{1}{2}', variables('fizz'), resourceGroup().id, subscription().id), 'default', uniqueString(resourceGroup().id, variables('fizz')))]",
+              "metadata": {
+                "resourceType": "Microsoft.Storage/storageAccounts/blobServices/containers@2019-06-01"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "test2",
+      "subscriptionId": "[parameters('modSubId')]",
+      "resourceGroup": "[parameters('modRgName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "p": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), 'Microsoft.Resources/deployments', 'test'), '2020-10-01').outputs.storage.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "dev",
+              "templateHash": "14376819795241421967"
+            }
+          },
+          "parameters": {
+            "p": {
+              "type": "string",
+              "metadata": {
+                "resourceType": "Microsoft.Storage/storageAccounts@2019-06-01"
+              }
+            }
+          },
+          "resources": [],
+          "outputs": {
+            "storage": {
+              "type": "string",
+              "value": "[parameters('p')]",
+              "metadata": {
+                "resourceType": "Microsoft.Storage/storageAccounts@2019-06-01"
+              }
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), 'Microsoft.Resources/deployments', 'test')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "anotherTest",
+      "scope": "[format('Microsoft.Management/managementGroups/{0}', 'myMg')]",
+      "location": "[deployment().location]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-08-01/managementGroupDeploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "dev",
+              "templateHash": "7917352326674540873"
+            }
+          },
+          "parameters": {
+            "snap": {
+              "type": "string",
+              "defaultValue": "[parameters('crackle')]"
+            },
+            "crackle": {
+              "type": "string",
+              "defaultValue": "pop"
+            }
+          },
+          "resources": [],
+          "outputs": {
+            "policy": {
+              "type": "string",
+              "value": "[extensionResourceId(managementGroup().id, 'Microsoft.Authorization/policyDefinitions', guid(managementGroup().name, managementGroup().properties.tenantId, parameters('snap')))]",
+              "metadata": {
+                "resourceType": "Microsoft.Authorization/policyDefinitions@2020-09-01"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "copy": {
+        "name": "arrayMod",
+        "count": "[length(range(0, 10))]"
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('test{0}', range(0, 10)[copyIndex()])]",
+      "subscriptionId": "[parameters('otherSubId')]",
+      "resourceGroup": "[parameters('modRgName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "foo": {
+            "value": "[format('baz{0}', range(0, 10)[copyIndex()])]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "dev",
+              "templateHash": "6948291255971177717"
+            }
+          },
+          "parameters": {
+            "foo": {
+              "type": "string",
+              "defaultValue": "[parameters('bar')]"
+            },
+            "bar": {
+              "type": "string",
+              "defaultValue": "baz"
+            }
+          },
+          "variables": {
+            "fizz": "[parameters('foo')]"
+          },
+          "resources": [],
+          "outputs": {
+            "storage": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Storage/storageAccounts', format('test{0}{1}{2}', variables('fizz'), resourceGroup().id, subscription().id))]",
+              "metadata": {
+                "resourceType": "Microsoft.Storage/storageAccounts@2019-06-01"
+              }
+            },
+            "container": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', format('test{0}{1}{2}', variables('fizz'), resourceGroup().id, subscription().id), 'default', uniqueString(resourceGroup().id, variables('fizz')))]",
+              "metadata": {
+                "resourceType": "Microsoft.Storage/storageAccounts/blobServices/containers@2019-06-01"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "id": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), 'Microsoft.Resources/deployments', 'test'), '2020-10-01').outputs.storage.value]"
+    },
+    "name": {
+      "type": "string",
+      "value": "[last(split(reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), 'Microsoft.Resources/deployments', 'test'), '2020-10-01').outputs.storage.value, '/'))]"
+    },
+    "type": {
+      "type": "string",
+      "value": "Microsoft.Storage/storageAccounts"
+    },
+    "apiVersion": {
+      "type": "string",
+      "value": "2019-06-01"
+    },
+    "accessTier": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), 'Microsoft.Storage/storageAccounts', format('test{0}{1}{2}', 'bar', format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), format('/subscriptions/{0}', parameters('modSubId')))), '2019-06-01').accessTier]"
+    },
+    "publicAccess": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), 'Microsoft.Storage/storageAccounts/blobServices/containers', format('test{0}{1}{2}', 'bar', format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), format('/subscriptions/{0}', parameters('modSubId'))), 'default', uniqueString(format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), 'bar')), '2019-06-01').publicAccess]"
+    },
+    "indirectionAccessTier": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), 'Microsoft.Storage/storageAccounts', format('test{0}{1}{2}', 'bar', format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), format('/subscriptions/{0}', parameters('modSubId')))), '2019-06-01').accessTier]"
+    },
+    "policyType": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(tenantResourceId('Microsoft.Management/managementGroups', 'myMg'), 'Microsoft.Authorization/policyDefinitions', guid('myMg', tenant().tenantId, 'pop')), '2020-09-01').policyType]"
+    },
+    "id9": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('otherSubId'), parameters('modRgName')), 'Microsoft.Resources/deployments', format('test{0}', range(0, 10)[9])), '2020-10-01').outputs.storage.value]"
+    },
+    "publicAccess9": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('otherSubId'), parameters('modRgName')), 'Microsoft.Storage/storageAccounts/blobServices/containers', format('test{0}{1}{2}', format('baz{0}', range(0, 10)[copyIndex()]), format('/subscriptions/{0}/resourceGroups/{1}', parameters('otherSubId'), parameters('modRgName')), format('/subscriptions/{0}', parameters('otherSubId'))), 'default', uniqueString(format('/subscriptions/{0}/resourceGroups/{1}', parameters('otherSubId'), parameters('modRgName')), format('baz{0}', range(0, 10)[copyIndex()]))), '2019-06-01').publicAccess]"
+    }
+  }
+}

@@ -1,0 +1,337 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-08-01/tenantDeploymentTemplate.json#",
+  "languageVersion": "1.9-experimental",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+    "_generator": {
+      "name": "bicep",
+      "version": "dev",
+      "templateHash": "6468988962640539676"
+    }
+  },
+  "parameters": {
+    "modSubId": {
+      "type": "string"
+    },
+    "modRgName": {
+      "type": "string"
+    },
+    "otherSubId": {
+      "type": "string"
+    }
+  },
+  "resources": {
+    "mod": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "test",
+      "subscriptionId": "[parameters('modSubId')]",
+      "resourceGroup": "[parameters('modRgName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "foo": {
+            "value": "bar"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "1.9-experimental",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+            "_generator": {
+              "name": "bicep",
+              "version": "dev",
+              "templateHash": "14012652947895278441"
+            }
+          },
+          "parameters": {
+            "foo": {
+              "type": "string",
+              "defaultValue": "[parameters('bar')]"
+            },
+            "bar": {
+              "type": "string",
+              "defaultValue": "baz"
+            }
+          },
+          "variables": {
+            "fizz": "[parameters('foo')]"
+          },
+          "resources": {
+            "storage::blobServices::container": {
+              "existing": true,
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+              "apiVersion": "2019-06-01",
+              "name": "[format('{0}/{1}/{2}', format('test{0}{1}{2}', variables('fizz'), resourceGroup().id, subscription().id), 'default', uniqueString(resourceGroup().id, variables('fizz')))]"
+            },
+            "storage::blobServices": {
+              "existing": true,
+              "type": "Microsoft.Storage/storageAccounts/blobServices",
+              "apiVersion": "2019-06-01",
+              "name": "[format('{0}/{1}', format('test{0}{1}{2}', variables('fizz'), resourceGroup().id, subscription().id), 'default')]"
+            },
+            "storage": {
+              "existing": true,
+              "type": "Microsoft.Storage/storageAccounts",
+              "apiVersion": "2019-06-01",
+              "name": "[format('test{0}{1}{2}', variables('fizz'), resourceGroup().id, subscription().id)]"
+            }
+          },
+          "outputs": {
+            "storage": {
+              "type": "string",
+              "value": "[resourceInfo('storage').id]",
+              "metadata": {
+                "resourceType": "Microsoft.Storage/storageAccounts@2019-06-01"
+              }
+            },
+            "container": {
+              "type": "string",
+              "value": "[resourceInfo('storage::blobServices::container').id]",
+              "metadata": {
+                "resourceType": "Microsoft.Storage/storageAccounts/blobServices/containers@2019-06-01"
+              }
+            }
+          }
+        }
+      }
+    },
+    "otherMod": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "test2",
+      "subscriptionId": "[parameters('modSubId')]",
+      "resourceGroup": "[parameters('modRgName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "p": {
+            "value": "[reference('mod').outputs.storage.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "1.9-experimental",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+            "_generator": {
+              "name": "bicep",
+              "version": "dev",
+              "templateHash": "13697896139992127620"
+            }
+          },
+          "parameters": {
+            "p": {
+              "type": "string",
+              "metadata": {
+                "resourceType": "Microsoft.Storage/storageAccounts@2019-06-01"
+              }
+            }
+          },
+          "resources": {},
+          "outputs": {
+            "storage": {
+              "type": "string",
+              "value": "[parameters('p')]",
+              "metadata": {
+                "resourceType": "Microsoft.Storage/storageAccounts@2019-06-01"
+              }
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "mod"
+      ]
+    },
+    "xMgMod": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "anotherTest",
+      "scope": "[format('Microsoft.Management/managementGroups/{0}', 'myMg')]",
+      "location": "[deployment().location]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-08-01/managementGroupDeploymentTemplate.json#",
+          "languageVersion": "1.9-experimental",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+            "_generator": {
+              "name": "bicep",
+              "version": "dev",
+              "templateHash": "1078777080207314893"
+            }
+          },
+          "parameters": {
+            "snap": {
+              "type": "string",
+              "defaultValue": "[parameters('crackle')]"
+            },
+            "crackle": {
+              "type": "string",
+              "defaultValue": "pop"
+            }
+          },
+          "resources": {
+            "policy": {
+              "existing": true,
+              "type": "Microsoft.Authorization/policyDefinitions",
+              "apiVersion": "2020-09-01",
+              "name": "[guid(managementGroup().name, managementGroup().properties.tenantId, parameters('snap'))]"
+            }
+          },
+          "outputs": {
+            "policy": {
+              "type": "string",
+              "value": "[resourceInfo('policy').id]",
+              "metadata": {
+                "resourceType": "Microsoft.Authorization/policyDefinitions@2020-09-01"
+              }
+            }
+          }
+        }
+      }
+    },
+    "arrayMod": {
+      "copy": {
+        "name": "arrayMod",
+        "count": "[length(range(0, 10))]"
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2020-10-01",
+      "name": "[format('test{0}', range(0, 10)[copyIndex()])]",
+      "subscriptionId": "[parameters('otherSubId')]",
+      "resourceGroup": "[parameters('modRgName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "foo": {
+            "value": "[format('baz{0}', range(0, 10)[copyIndex()])]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "1.9-experimental",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_EXPERIMENTAL_WARNING": "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!",
+            "_generator": {
+              "name": "bicep",
+              "version": "dev",
+              "templateHash": "14012652947895278441"
+            }
+          },
+          "parameters": {
+            "foo": {
+              "type": "string",
+              "defaultValue": "[parameters('bar')]"
+            },
+            "bar": {
+              "type": "string",
+              "defaultValue": "baz"
+            }
+          },
+          "variables": {
+            "fizz": "[parameters('foo')]"
+          },
+          "resources": {
+            "storage::blobServices::container": {
+              "existing": true,
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+              "apiVersion": "2019-06-01",
+              "name": "[format('{0}/{1}/{2}', format('test{0}{1}{2}', variables('fizz'), resourceGroup().id, subscription().id), 'default', uniqueString(resourceGroup().id, variables('fizz')))]"
+            },
+            "storage::blobServices": {
+              "existing": true,
+              "type": "Microsoft.Storage/storageAccounts/blobServices",
+              "apiVersion": "2019-06-01",
+              "name": "[format('{0}/{1}', format('test{0}{1}{2}', variables('fizz'), resourceGroup().id, subscription().id), 'default')]"
+            },
+            "storage": {
+              "existing": true,
+              "type": "Microsoft.Storage/storageAccounts",
+              "apiVersion": "2019-06-01",
+              "name": "[format('test{0}{1}{2}', variables('fizz'), resourceGroup().id, subscription().id)]"
+            }
+          },
+          "outputs": {
+            "storage": {
+              "type": "string",
+              "value": "[resourceInfo('storage').id]",
+              "metadata": {
+                "resourceType": "Microsoft.Storage/storageAccounts@2019-06-01"
+              }
+            },
+            "container": {
+              "type": "string",
+              "value": "[resourceInfo('storage::blobServices::container').id]",
+              "metadata": {
+                "resourceType": "Microsoft.Storage/storageAccounts/blobServices/containers@2019-06-01"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {
+    "id": {
+      "type": "string",
+      "value": "[reference('mod').outputs.storage.value]"
+    },
+    "name": {
+      "type": "string",
+      "value": "[last(split(reference('mod').outputs.storage.value, '/'))]"
+    },
+    "type": {
+      "type": "string",
+      "value": "Microsoft.Storage/storageAccounts"
+    },
+    "apiVersion": {
+      "type": "string",
+      "value": "2019-06-01"
+    },
+    "accessTier": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), 'Microsoft.Storage/storageAccounts', format('test{0}{1}{2}', 'bar', format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), format('/subscriptions/{0}', parameters('modSubId'))))).accessTier]"
+    },
+    "publicAccess": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), 'Microsoft.Storage/storageAccounts/blobServices/containers', format('test{0}{1}{2}', 'bar', format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), format('/subscriptions/{0}', parameters('modSubId'))), 'default', uniqueString(format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), 'bar'))).publicAccess]"
+    },
+    "indirectionAccessTier": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), 'Microsoft.Storage/storageAccounts', format('test{0}{1}{2}', 'bar', format('/subscriptions/{0}/resourceGroups/{1}', parameters('modSubId'), parameters('modRgName')), format('/subscriptions/{0}', parameters('modSubId'))))).accessTier]"
+    },
+    "policyType": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(tenantResourceId('Microsoft.Management/managementGroups', 'myMg'), 'Microsoft.Authorization/policyDefinitions', guid('myMg', tenant().tenantId, 'pop'))).policyType]"
+    },
+    "id9": {
+      "type": "string",
+      "value": "[reference('arrayMod').outputs.storage.value]"
+    },
+    "publicAccess9": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', parameters('otherSubId'), parameters('modRgName')), 'Microsoft.Storage/storageAccounts/blobServices/containers', format('test{0}{1}{2}', format('baz{0}', range(0, 10)[copyIndex()]), format('/subscriptions/{0}/resourceGroups/{1}', parameters('otherSubId'), parameters('modRgName')), format('/subscriptions/{0}', parameters('otherSubId'))), 'default', uniqueString(format('/subscriptions/{0}/resourceGroups/{1}', parameters('otherSubId'), parameters('modRgName')), format('baz{0}', range(0, 10)[copyIndex()])))).publicAccess]"
+    }
+  }
+}

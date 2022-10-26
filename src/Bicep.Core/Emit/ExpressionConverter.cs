@@ -6,6 +6,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using Azure.Deployments.Core.Definitions.Schema;
 using Azure.Deployments.Expression.Expressions;
 using Bicep.Core.DataFlow;
 using Bicep.Core.Extensions;
@@ -13,6 +14,7 @@ using Bicep.Core.Semantics;
 using Bicep.Core.Semantics.Metadata;
 using Bicep.Core.Syntax;
 using Bicep.Core.TypeSystem;
+using Bicep.Core.TypeSystem.Az;
 using Microsoft.WindowsAzure.ResourceStack.Common.Extensions;
 using Newtonsoft.Json.Linq;
 
@@ -425,7 +427,7 @@ namespace Bicep.Core.Emit
                 moduleCollectionOutputs.BaseExpression is ArrayAccessSyntax moduleArrayAccess &&
                 context.SemanticModel.ResourceMetadata.TryLookup(propertyAccess.BaseExpression) is ModuleOutputResourceMetadata moduleCollectionOutputMetadata &&
                 moduleCollectionOutputMetadata.Module.IsCollection &&
-                CreateConverterForIndexReplacement(moduleCollectionOutputMetadata.NameSyntax, moduleArrayAccess.IndexExpression, propertyAccess)
+                CreateConverterForIndexReplacement(moduleCollectionOutputMetadata.ModuleNameSyntax, moduleArrayAccess.IndexExpression, propertyAccess)
                     .ConvertResourcePropertyAccess(moduleCollectionOutputMetadata, null, propertyAccess.PropertyName.IdentifierName) is { } convertedCollectionModuleOutput)
             {
                 // we are doing property access on an output of an array of modules.
@@ -548,6 +550,49 @@ namespace Bicep.Core.Emit
                     CreateFunction("split", nameExpression, new JTokenExpression("/")),
                     new JTokenExpression(i)));
         }
+
+        //public IEnumerable<LanguageExpression> GetResourceNameSegments(ModuleOutputResourceMetadata resource)
+        //{
+        //    // TODO move this into az extension
+        //    var typeReference = resource.TypeReference;
+        //    var ancestors = this.context.SemanticModel.ResourceAncestors.GetAncestors(resource);
+        //    var nameExpression = ConvertExpression(resource.NameSyntax);
+
+        //    var typesAfterProvider = typeReference.TypeSegments.Skip(1).ToImmutableArray();
+
+        //    if (ancestors.Length > 0)
+        //    {
+        //        var firstAncestorNameLength = typesAfterProvider.Length - ancestors.Length;
+
+        //        var parentNames = ancestors.SelectMany((x, i) =>
+        //        {
+        //            var expression = GetResourceNameAncestorSyntaxSegment(resource, i);
+        //            var nameExpression = this.ConvertExpression(expression);
+
+        //            if (i == 0 && firstAncestorNameLength > 1)
+        //            {
+        //                return Enumerable.Range(0, firstAncestorNameLength).Select(
+        //                    (_, i) => AppendProperties(
+        //                        CreateFunction("split", nameExpression, new JTokenExpression("/")),
+        //                        new JTokenExpression(i)));
+        //            }
+
+        //            return nameExpression.AsEnumerable();
+        //        });
+
+        //        return parentNames.Concat(nameExpression.AsEnumerable());
+        //    }
+
+        //    if (typesAfterProvider.Length == 1)
+        //    {
+        //        return nameExpression.AsEnumerable();
+        //    }
+
+        //    return typesAfterProvider.Select(
+        //        (type, i) => AppendProperties(
+        //            CreateFunction("split", nameExpression, new JTokenExpression("/")),
+        //            new JTokenExpression(i)));
+        //}
 
         /// <summary>
         /// Returns a collection of name segment expressions for the specified resource. Local variable replacements
@@ -775,24 +820,7 @@ namespace Bicep.Core.Emit
 
         public FunctionExpression GetReferenceExpression(ResourceMetadata resource, SyntaxBase? indexExpression, bool full)
         {
-            var referenceExpression = resource switch
-            {
-                ParameterResourceMetadata parameter => new FunctionExpression(
-                    "parameters",
-                    new LanguageExpression[] { new JTokenExpression(parameter.Symbol.Name), },
-                    Array.Empty<LanguageExpression>()),
-
-                ModuleOutputResourceMetadata output => AppendProperties(
-                    GetModuleOutputsReferenceExpression(output.Module, null),
-                    new JTokenExpression(output.OutputName),
-                    new JTokenExpression("value")),
-
-                DeclaredResourceMetadata declared when context.Settings.EnableSymbolicNames =>
-                    GenerateSymbolicReference(declared, indexExpression),
-                DeclaredResourceMetadata => GetFullyQualifiedResourceId(resource),
-
-                _ => throw new InvalidOperationException($"Unexpected resource metadata type: {resource.GetType()}"),
-            };
+            var referenceExpression = GetResourceIdExpression(resource, indexExpression);
 
             if (!resource.IsAzResource)
             {
@@ -828,6 +856,315 @@ namespace Bicep.Core.Emit
             return CreateFunction(
                 "reference",
                 referenceExpression);
+        }
+
+        private LanguageExpression GetResourceIdExpression(ResourceMetadata resource, SyntaxBase? indexExpression) => resource switch
+        {
+            ParameterResourceMetadata parameter => new FunctionExpression(
+                "parameters",
+                new LanguageExpression[] { new JTokenExpression(parameter.Symbol.Name), },
+                Array.Empty<LanguageExpression>()),
+
+            ModuleOutputResourceMetadata output => output.ResourceIdExpression.Expression ?? throw new InvalidOperationException("Unable to hoist resource ID"),
+
+            DeclaredResourceMetadata declared when context.Settings.EnableSymbolicNames =>
+                GenerateSymbolicReference(declared, indexExpression),
+            DeclaredResourceMetadata => GetFullyQualifiedResourceId(resource),
+
+            _ => throw new InvalidOperationException($"Unexpected resource metadata type: {resource.GetType()}"),
+        };
+
+        // private LanguageExpression HoistResourceId(ModuleOutputResourceMetadata resource, SyntaxBase? indexExpression)
+        // {
+        //     if (resource.Module.TryGetSemanticModel(out var moduleModel, out var failureDiagnostic))
+        //     {
+        //         return moduleModel switch {
+        //             SemanticModel bicepModel => HoistResourceId(resource, bicepModel, indexExpression),
+        //             ArmTemplateSemanticModel armModel when (armModel.SourceFile.Template is { } template) => HoistResourceId(resource, template, indexExpression),
+        //             TemplateSpecSemanticModel specModel when (specModel.SourceFile.MainTemplateFile.Template is { } template) => HoistResourceId(resource, template, indexExpression),
+        //             _ => throw new InvalidOperationException("Unrecognized semantic model implementation"),
+        //         };
+        //     } else
+        //     {
+        //         throw new InvalidOperationException(
+        //             $"Resource IDs cannot be hoisted from module '{resource.Module.Name}' as it reported error-level diagnostic {failureDiagnostic.Code}.");
+        //     }
+        // }
+
+        // private LanguageExpression HoistResourceId(ModuleOutputResourceMetadata resource, SemanticModel moduleModel, SyntaxBase? indexExpression)
+        // {
+        //     if (moduleModel.Binder.FileSymbol.OutputDeclarations.Where(os => os.Name == resource.OutputName).FirstOrDefault() is {} outputSymbol)
+        //     {
+        //         var translationVisitor = new NameSyntaxTranslationVisitor(resource.Module, moduleModel, context.ModuleScopeData[resource.Module]);
+        //         var moduleContext = new EmitterContext(moduleModel, context.Settings);
+        //         var moduleConverter = new ExpressionConverter(moduleContext);
+        //         switch (moduleModel.ResourceMetadata.TryLookup(outputSymbol.Value))
+        //         {
+        //             case DeclaredResourceMetadata declared:
+        //                 return ScopeHelper.FormatFullyQualifiedResourceId(
+        //                     moduleContext,
+        //                     moduleConverter,
+        //                     moduleContext.ResourceScopeData[declared],
+        //                     declared.TypeReference.FormatType(),
+        //                     moduleConverter.GetResourceNameSyntaxSegments(declared).Select(s => translationVisitor.Rewrite(s)).Select(ConvertExpression));
+        //             case ParameterResourceMetadata parameter:
+        //                 var hoisted = translationVisitor.Rewrite(outputSymbol.Value);
+        //                 // A resource-typed parameter could be a resource in the parent module
+        //                 if (context.SemanticModel.ResourceMetadata.TryLookup(hoisted) is { } passedInResource)
+        //                 {
+        //                     return GetResourceIdExpression(passedInResource, indexExpression);
+        //                 }
+        //                 // or it could be a scalar
+        //                 return ConvertExpression(hoisted);
+        //             case ModuleOutputResourceMetadata output:
+        //                 return LanguageExpressionRewriter.Rewrite(output.ResourceIdExpression.Expression ?? throw new InvalidOperationException("Boo"), NameExpressionTranslator(resource.Module, moduleModel, context.ModuleScopeData[resource.Module]));
+        //             default:
+        //                 throw new InvalidOperationException("Unrecognized resource metadata type");
+        //         }
+        //     } else
+        //     {
+        //         throw new InvalidOperationException($"Unable to locate resource output {resource.OutputName} in model for module {resource.Module.Name}.");
+        //     }
+        // }
+
+        // private LanguageExpression HoistResourceId(ModuleOutputResourceMetadata resource, Template template, SyntaxBase? indexExpression)
+        // {
+        //     // This method will need to distinguish betwen declared resources, resource-typed parameters, and resource-typed module outputs.
+        //     throw new NotImplementedException();
+        // }
+
+        // private class NameSyntaxTranslationVisitor : SyntaxRewriteVisitor
+        // {
+        //     private readonly ModuleSymbol module;
+        //     private readonly SemanticModel semanticModel;
+        //     private readonly ScopeHelper.ScopeData moduleScope;
+
+        //     internal NameSyntaxTranslationVisitor(ModuleSymbol module, SemanticModel semanticModel, ScopeHelper.ScopeData moduleScope)
+        //     {
+        //         this.module = module;
+        //         this.semanticModel = semanticModel;
+        //         this.moduleScope = moduleScope;
+        //     }
+
+        //     protected override SyntaxBase ReplaceForSyntax(ForSyntax syntax)
+        //     {
+        //         throw new NotImplementedException("I guess this would need to be translated to a map expression? Seems messy.");
+        //     }
+
+        //     protected override SyntaxBase ReplacePropertyAccessSyntax(PropertyAccessSyntax syntax)
+        //     {
+        //         if (syntax.BaseExpression is FunctionCallSyntax callSyntax)
+        //         {
+        //             if (callSyntax.Name.IdentifierName == "resourceGroup" && moduleScope.ResourceGroupProperty is { } resourceGroup)
+        //             {
+        //                 return ReplaceResourceGroupPropertyAccess(syntax, resourceGroup, moduleScope.SubscriptionIdProperty);
+        //             }
+        //             else if (callSyntax.Name.IdentifierName == "subscription" && moduleScope.SubscriptionIdProperty is { } subscriptionId)
+        //             {
+        //                 return ReplaceSubscriptionPropertyAccess(syntax, subscriptionId);
+        //             }
+        //             else if (callSyntax.Name.IdentifierName == "managementGroup" && moduleScope.ManagementGroupNameProperty is { } managementGroup)
+        //             {
+        //                 return ReplaceManagementGroupPropertyAccess(syntax, managementGroup);
+        //             }
+        //         }
+        //         else if (syntax.BaseExpression is PropertyAccessSyntax parentProp &&
+        //             parentProp.BaseExpression is FunctionCallSyntax parentCall &&
+        //             parentCall.Name.IdentifierName == "managementGroup" &&
+        //             parentProp.PropertyName.IdentifierName == "properties" &&
+        //             moduleScope.ManagementGroupNameProperty is not null)
+        //         {
+        //             return ReplaceManagementGroupPropertiesPropertyAccess(syntax);
+        //         }
+
+        //         return base.ReplacePropertyAccessSyntax(syntax);
+        //     }
+
+        //     private static SyntaxBase ReplaceResourceGroupPropertyAccess(PropertyAccessSyntax current, SyntaxBase targetResourceGroup, SyntaxBase? targetSubscriptionId) => current.PropertyName.IdentifierName switch
+        //     {
+        //         "name" => targetResourceGroup,
+        //         "type" => SyntaxFactory.CreateStringLiteral(AzResourceTypeProvider.ResourceTypeResourceGroup),
+        //         "id" => SyntaxFactory.CreateString(new[] { "/subscriptions/", "/resourceGroups/", string.Empty }, new[]
+        //         {
+        //             targetSubscriptionId is not null
+        //                 ? targetSubscriptionId
+        //                 : SyntaxFactory.CreatePropertyAccess(SyntaxFactory.CreateFunctionCall("subscription"), "subscriptionId"),
+        //             targetResourceGroup
+        //         }),
+        //         // The emit limitation calculator should have raised an error diagnostic for cross-RG module output resources whose names dereference the target RG's 'location', 'managedBy', 'tags', or 'properties' property.
+        //         string unsupportedPropertyName => throw new InvalidOperationException(
+        //             $"A resource group's '{unsupportedPropertyName}' property cannot be calculated by ARM from outside a deployment within that resource group."),
+        //     };
+
+        //     private static SyntaxBase ReplaceSubscriptionPropertyAccess(PropertyAccessSyntax current, SyntaxBase targetSubscriptionId) => current.PropertyName.IdentifierName switch
+        //     {
+        //         "subscriptionId" => targetSubscriptionId,
+        //         "id" => SyntaxFactory.CreateString(new[] { "/subscriptions/", string.Empty }, new[] { targetSubscriptionId }),
+        //         // cross-tenant nested deployments are not a thing; dereference the current tenant
+        //         "tenantId" => CreateTenantIdExpressionSyntax(),
+        //         // The emit limitation calculator should have raised an error diagnostic for cross-subscription module output resources whose names dereference the target subscription's 'displayName'
+        //         string unsupportedPropertyName => throw new InvalidOperationException(
+        //             $"A subscription's '{unsupportedPropertyName}' property cannot be calculated by ARM from outside a deployment within that subscription."),
+        //     };
+
+        //     private static SyntaxBase ReplaceManagementGroupPropertyAccess(PropertyAccessSyntax current, SyntaxBase targetManagementGroup) => current.PropertyName.IdentifierName switch
+        //     {
+        //         "name" => targetManagementGroup,
+        //         "type" => SyntaxFactory.CreateStringLiteral($"/providers/{AzResourceTypeProvider.ResourceTypeManagementGroup}"),
+        //         "id" => SyntaxFactory.CreateString(new[] { $"/providers/{AzResourceTypeProvider.ResourceTypeManagementGroup}", string.Empty }, new[] { targetManagementGroup }),
+        //         // The emit limitation calculator should have raised an error diagnostic for cross-MG module output resources whose names dereference unknown properties from the target MG.
+        //         string unsupportedPropertyName => throw new InvalidOperationException(
+        //             $"A management group's '{unsupportedPropertyName}' property cannot be calculated by ARM from outside a deployment in that management group at managementGroup scope."),
+        //     };
+
+        //     private static SyntaxBase ReplaceManagementGroupPropertiesPropertyAccess(PropertyAccessSyntax current) => current.PropertyName.IdentifierName switch
+        //     {
+        //         "tenantId" => CreateTenantIdExpressionSyntax(),
+        //         // The emit limitation calculator should have raised an error diagnostic for cross-MG module output resources whose names dereference the target MG's 'properties.details' or 'properties.displayName' property.
+        //         string unsupportedPropertyName => throw new InvalidOperationException(
+        //             $"A management group's 'properties.{unsupportedPropertyName}' property cannot be calculated by ARM from outside a deployment in that management group at managementGroup scope."),
+        //     };
+
+        //     private static SyntaxBase CreateTenantIdExpressionSyntax() => SyntaxFactory.CreatePropertyAccess(SyntaxFactory.CreateFunctionCall("tenant"), "tenantId");
+
+        //     protected override SyntaxBase ReplaceVariableAccessSyntax(VariableAccessSyntax syntax)
+        //         => semanticModel.GetSymbolInfo(syntax) switch
+        //         {
+        //             ParameterSymbol parameter => ReplaceVariableAccessSyntax(syntax, parameter),
+        //             VariableSymbol variable => Rewrite(variable.Value),
+        //             Symbol unsupportedSymbol => throw new InvalidOperationException($"Cannot replace symbols of kind '{unsupportedSymbol.Kind}'"),
+        //             _ => throw new InvalidOperationException($"Invalid or missing symbol '{syntax.Name.IdentifierName}'"),
+        //         };
+
+        //     private SyntaxBase ReplaceVariableAccessSyntax(VariableAccessSyntax syntax, ParameterSymbol parameterSymbol)
+        //     {
+        //         if (GetSuppliedParameterValue(module, parameterSymbol) is { } suppliedValue)
+        //         {
+        //             return suppliedValue;
+        //         }
+
+        //         if (parameterSymbol.DeclaringParameter.Modifier is ParameterDefaultValueSyntax defaultValueSyntax)
+        //         {
+        //             return Rewrite(defaultValueSyntax.DefaultValue);
+        //         }
+
+        //         throw new InvalidOperationException($"No value was supplied for required parameter '{syntax.Name.IdentifierName}'");
+        //     }
+        // }
+
+        private static SyntaxBase? GetSuppliedParameterValue(ModuleSymbol module, ParameterSymbol parameterSymbol)
+        {
+            if (module.TryGetBodyPropertyValue(LanguageConstants.ModuleParamsPropertyName) is ObjectSyntax paramsObject
+                && paramsObject.TryGetPropertyByName(parameterSymbol.Name) is { } suppliedValue)
+            {
+                return suppliedValue.Value;
+            }
+
+            return default;
+        }
+
+        private Func<LanguageExpression, LanguageExpression> NameExpressionTranslator(ModuleSymbol module, SemanticModel moduleModel, ScopeHelper.ScopeData scopeData)
+            => expression =>
+            {
+                if (expression is not FunctionExpression functionExpression)
+                {
+                    return expression;
+                }
+
+                return functionExpression.Function switch
+                {
+                    "parameters" => TranslateProperties(module, moduleModel, scopeData, TranslateParametersFunctionExpression(module, moduleModel, scopeData, Translate(module, moduleModel, scopeData, functionExpression.Parameters).Single()), functionExpression.Properties),
+                    "variables" => TranslateProperties(module, moduleModel, scopeData, TranslateVariablesFunctionExpression(module, moduleModel, scopeData, Translate(module, moduleModel, scopeData, functionExpression.Parameters).Single()), functionExpression.Properties),
+                    "resourceGroup" when scopeData.ResourceGroupProperty is not null => throw new NotImplementedException(),
+                    "subscription" when scopeData.SubscriptionIdProperty is not null => throw new NotImplementedException(),
+                    "managementGroup" when scopeData.ManagementGroupNameProperty is not null => throw new NotImplementedException(),
+                    _ => TranslateProperties(module, moduleModel, scopeData, functionExpression, Array.Empty<LanguageExpression>()),
+                };
+            };
+
+        // private Func<LanguageExpression, LanguageExpression> NameExpressionTranslator(ModuleSymbol module, Template armTemplate, ScopeHelper.ScopeData scopeData)
+        //     => expression =>
+        //     {
+        //         throw new NotImplementedException();
+        //     };
+
+        private LanguageExpression TranslateProperties(ModuleSymbol module, SemanticModel moduleModel, ScopeHelper.ScopeData scopeData, LanguageExpression expression, LanguageExpression[] properties)
+        {
+            if (expression is not FunctionExpression functionExpression)
+            {
+                if (properties.Length > 0)
+                {
+                    if (expression is JTokenExpression jToken && jToken.Value is IEnumerable<KeyValuePair<string, JToken>> jObject)
+                    {
+                        return new FunctionExpression("createObject", jObject.SelectMany(From).ToArray(), properties);
+                    }
+
+                    throw new InvalidOperationException("Only object literals can use property dereference");
+                }
+
+                return expression;
+            }
+
+            return new FunctionExpression(functionExpression.Function, Translate(module, moduleModel, scopeData, functionExpression.Parameters), Translate(module, moduleModel, scopeData, functionExpression.Properties.ConcatArray(properties)));
+        }
+
+        private LanguageExpression[] Translate(ModuleSymbol module, SemanticModel moduleModel, ScopeHelper.ScopeData scopeData, LanguageExpression[] expressions)
+            => expressions.Select(e => LanguageExpressionRewriter.Rewrite(e, NameExpressionTranslator(module, moduleModel, scopeData))).ToArray();
+
+        private static IEnumerable<LanguageExpression> From(KeyValuePair<string, JToken> kvp)
+        {
+            yield return new JTokenExpression(kvp.Key);
+            if (Activator.CreateInstance(typeof(JTokenExpression), true, new[] { kvp.Value }) is LanguageExpression expression)
+            {
+                yield return expression;
+            } else
+            {
+                throw new InvalidOperationException("No valid constructor found.");
+            }
+        }
+
+        private LanguageExpression TranslateParametersFunctionExpression(ModuleSymbol module, SemanticModel moduleModel, ScopeHelper.ScopeData scopeData, LanguageExpression? parameterNameExpression)
+        {
+            // "[parameters(parameters('bar'))]" etc. is perfectly legal and only sometimes compile-time resolvable.
+            // FunctionExpressions compiled from Bicep VariableAccessSyntax nodes will never take this form, but hand-written ARM templates could definitely include such an expression.
+            if (parameterNameExpression is not JTokenExpression jTokenExpression || jTokenExpression.Value is not JValue jValue || jValue.Value is not string parameterName)
+            {
+                throw new InvalidOperationException($"Unable to perform compile-time resolution of parameters() expression.");
+            }
+
+            if (moduleModel.Binder.FileSymbol.ParameterDeclarations.Where(ps => ps.Name == parameterName).FirstOrDefault() is { } parameter)
+            {
+                if (GetSuppliedParameterValue(module, parameter) is { } suppliedValue)
+                {
+                    return ConvertExpression(suppliedValue);
+                }
+
+                if (parameter.DeclaringParameter.Modifier is ParameterDefaultValueSyntax defaultValueSyntax)
+                {
+                    return LanguageExpressionRewriter.Rewrite(ConvertExpression(defaultValueSyntax.DefaultValue), NameExpressionTranslator(module, moduleModel, scopeData));
+                }
+
+                throw new InvalidOperationException($"No value found for parameter ${parameterName}.");
+            }
+
+            throw new InvalidOperationException($"Parameter {parameterName} not found.");
+        }
+
+        private LanguageExpression TranslateVariablesFunctionExpression(ModuleSymbol module, SemanticModel moduleModel, ScopeHelper.ScopeData scopeData, LanguageExpression? variableNameExpression)
+        {
+            // "[variables(variables('bar'))]" etc. is perfectly legal and only sometimes compile-time resolvable.
+            // FunctionExpressions compiled from Bicep VariableAccessSyntax nodes will never take this form, but hand-written ARM templates could definitely include such an expression.
+            if (variableNameExpression is not JTokenExpression jTokenExpression || jTokenExpression.Value is not JValue jValue || jValue.Value is not string variableName)
+            {
+                throw new InvalidOperationException($"Unable to perform compile-time resolution of variables() expression.");
+            }
+
+            if (moduleModel.GetSymbolInfo(SyntaxFactory.CreateVariableAccess(variableName)) is VariableSymbol variableSymbol)
+            {
+                return LanguageExpressionRewriter.Rewrite(ConvertExpression(variableSymbol.Value), NameExpressionTranslator(module, moduleModel, scopeData));
+            }
+
+            throw new InvalidOperationException($"Variable {variableName} not found.");
         }
 
         private LanguageExpression GetLocalVariableExpression(LocalVariableSymbol localVariableSymbol)
@@ -1287,4 +1624,3 @@ namespace Bicep.Core.Emit
         }
     }
 }
-

@@ -103,6 +103,8 @@ namespace Bicep.Core.Samples
 
         public static DataSet Lambdas_LF => CreateDataSet();
 
+        public static DataSet ResourceOutputs_CRLF => CreateDataSet();
+
         public static IEnumerable<DataSet> AllDataSets =>
             typeof(DataSets)
                 .GetProperties(BindingFlags.Public | BindingFlags.GetProperty | BindingFlags.Static)

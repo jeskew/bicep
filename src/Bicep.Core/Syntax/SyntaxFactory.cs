@@ -246,6 +246,10 @@ namespace Bicep.Core.Syntax
         private static IEnumerable<SyntaxBase> Interleave(IEnumerable<SyntaxBase> elements, Func<SyntaxBase> getInterleaveSyntax)
             => elements.SelectMany((x, i) => i > 0 ? getInterleaveSyntax().AsEnumerable().Concat(x) : x.AsEnumerable());
 
+        public static PropertyAccessSyntax CreatePropertyAccess(SyntaxBase baseExpression, string propertyName) => CreatePropertyAccess(baseExpression, CreateIdentifier(propertyName));
+
+        public static PropertyAccessSyntax CreatePropertyAccess(SyntaxBase baseExpression, IdentifierSyntax propertyName) => new(baseExpression, DotToken, propertyName);
+
         private static string EscapeBicepString(string value)
             => value
             .Replace("\\", "\\\\") // must do this first!
